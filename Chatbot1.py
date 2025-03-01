@@ -35,37 +35,34 @@ genai.configure(api_key="AIzaSyByL4NmHQaeXOC4__zKMiDlaFFh5kZcnvw")
 gemini = genai.GenerativeModel('gemini-1.5-flash')
 embedder = SentenceTransformer('all-MiniLM-L6-v2')  # Embedding model
 
-# Load and preprocess CoQA dataset
+# Load and preprocess CoQA dataset in chunks
 @st.cache_data
-def load_coqa_data():
+def load_coqa_data(file_path, chunk_size=10000):
     try:
-        df = pd.read_json('coqa.json')  # Replace with the correct file path
-        conversations = []
+        contexts = []
+        for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+            for index, row in chunk.iterrows():
+                # Assuming 'story', 'question', and 'answer' are columns in your CSV
+                context = f"Story: {row['story']}\nQuestion: {row['question']}\nAnswer: {row['answer']}"
+                contexts.append(context)
         
-        for idx, row in df.iterrows():
-            story = row['story']
-            questions = row['questions']
-            answers = row['answers']
-            
-            for q, a in zip(questions, answers):
-                context = f"Story: {story}\nQuestion: {q['input_text']}\nAnswer: {a['input_text']}"
-                conversations.append(context)
-        
-        embeddings = embedder.encode(conversations)
+        embeddings = embedder.encode(contexts)
         index = faiss.IndexFlatL2(embeddings.shape[1])  # FAISS index for similarity search
         index.add(np.array(embeddings).astype('float32'))
         
-        return df, index, conversations
+        return contexts, index
     except Exception as e:
         st.error(f"Failed to load data. Error: {e}")
         st.stop()
-
-df, faiss_index, contexts = load_coqa_data()
 
 # App Header
 st.markdown('<h1 class="college-font">🗨️ CoQA Chatbot</h1>', unsafe_allow_html=True)
 st.markdown('<h3 class="college-font">Your Conversational QA Assistant</h3>', unsafe_allow_html=True)
 st.markdown("---")
+
+# Load data
+file_path = 'coqa.csv'  # Replace with your CSV file path
+contexts, faiss_index = load_coqa_data(file_path)
 
 # Function to find closest matching context using FAISS
 def find_closest_context(query, faiss_index, contexts):
