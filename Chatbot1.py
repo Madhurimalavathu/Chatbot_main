@@ -35,35 +35,33 @@ genai.configure(api_key="AIzaSyByL4NmHQaeXOC4__zKMiDlaFFh5kZcnvw")
 gemini = genai.GenerativeModel('gemini-1.5-flash')
 embedder = SentenceTransformer('all-MiniLM-L6-v2')  # Embedding model
 
-# Load and preprocess CoQA dataset using Hugging Face Datasets
+# Function to load and process WikiQA dataset
 @st.cache_data
-def load_coqa_data():
+def load_wikiqa_data():
     try:
-        dataset = load_dataset("coqa")  # Load CoQA dataset from Hugging Face Hub
+        dataset = load_dataset("microsoft/wiki_qa")
         contexts = []
-        
+
         for example in dataset['train']:
-            story = example['story']
-            questions = example['questions']
-            answers = example['answers']
-            
-            for q, a in zip(questions, answers):
-                context = f"Story: {story}\nQuestion: {q['input_text']}\nAnswer: {a['input_text']}"
-                contexts.append(context)
-        
+            question = example['question']
+            answer = example['answer']
+            context = f"Question: {question}\nAnswer: {answer}"
+            contexts.append(context)
+
         embeddings = embedder.encode(contexts)
         index = faiss.IndexFlatL2(embeddings.shape[1])  # FAISS index for similarity search
         index.add(np.array(embeddings).astype('float32'))
-        
+
         return contexts, index
     except Exception as e:
         st.error(f"Failed to load data. Error: {e}")
         st.stop()
 
-contexts, faiss_index = load_coqa_data()
+# Load data and FAISS index
+contexts, faiss_index = load_wikiqa_data()
 
 # App Header
-st.markdown('<h1 class="college-font">🗨️ CoQA Chatbot</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="college-font">🗨️ WikiQA Chatbot</h1>', unsafe_allow_html=True)
 st.markdown('<h3 class="college-font">Your Conversational QA Assistant</h3>', unsafe_allow_html=True)
 st.markdown("---")
 
@@ -94,7 +92,7 @@ for message in st.session_state.messages:
                         avatar="🙋" if message["role"] == "user" else "🤖"):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Ask anything based on the CoQA dataset..."):
+if prompt := st.chat_input("Ask anything based on the WikiQA dataset..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     with st.spinner("Finding the best answer..."):
